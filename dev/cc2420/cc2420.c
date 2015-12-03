@@ -179,6 +179,7 @@ static uint8_t volatile poll_mode = 0;
 /* Do we perform a CCA before sending? */
 static uint8_t send_on_cca = WITH_SEND_CCA;
 
+
 static radio_result_t
 get_value(radio_param_t param, radio_value_t *value)
 {

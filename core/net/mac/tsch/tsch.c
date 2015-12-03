@@ -627,7 +627,6 @@ PT_THREAD(tsch_scan(struct pt *pt))
 
     /* Turn radio on and wait for EB */
     NETSTACK_RADIO.on();
-
     /* Busy wait for a packet for 1 second */
     t0 = RTIMER_NOW();
 
@@ -636,8 +635,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
       /* If we are currently receiving a packet, wait until end of reception */
       BUSYWAIT_UNTIL_ABS((is_packet_pending = NETSTACK_RADIO.pending_packet()), t0, RTIMER_SECOND / TSCH_ASSOCIATION_POLL_FREQUENCY);
     }
-
-    if(is_packet_pending) {        
+    if(is_packet_pending) {
       /* Save packet timestamp */
       NETSTACK_RADIO.get_object(RADIO_PARAM_LAST_PACKET_TIMESTAMP, &t0, sizeof(rtimer_clock_t));
       
@@ -804,9 +802,10 @@ tsch_init(void)
     return;
   }
   /* Set radio in frame filtering */
-  radio_rx_mode |= RADIO_RX_MODE_ADDRESS_FILTER;
+  //radio_rx_mode |= RADIO_RX_MODE_ADDRESS_FILTER; 
   /* Unset autoack */
-  radio_rx_mode &= ~RADIO_RX_MODE_AUTOACK;
+  radio_rx_mode &= ~(1<<5);//ELCO MOD
+  //radio_rx_mode |= (1<<0);//Frame filter on  Settings not correct, so it does not work at the moment
   /* Set radio in poll mode */
   radio_rx_mode |= RADIO_RX_MODE_POLL_MODE;
   if(NETSTACK_RADIO.set_value(RADIO_PARAM_RX_MODE, radio_rx_mode) != RADIO_RESULT_OK) {

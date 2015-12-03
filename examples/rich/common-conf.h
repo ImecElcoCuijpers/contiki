@@ -36,6 +36,7 @@
 
 /* Global config flags */
 
+
 #define WITH_TSCH 1
 #define WITH_TSCH_SECURITY 0
 #define TSCH_LOG_CONF_LEVEL 2

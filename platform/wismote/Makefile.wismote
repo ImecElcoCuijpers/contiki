@@ -49,6 +49,8 @@ contiki-$(TARGET).a: ${addprefix $(OBJECTDIR)/,symbols.o}
 
 %.upload-clean: %.hex
 	msp430flasher -n msp430x5437 -w $< -v -z [VCC]
+CFLAGS += -mmemory-model=large -ffunction-sections -fdata-sections   -mcode-region=far -mdata-region=far
+LDFLAGS += -mmemory-model=large -Wl,-gc-sections -mcode-region=far -mdata-region=far
 
 MODULES += core/net core/net/mac \
            core/net/mac/contikimac \

@@ -2,10 +2,10 @@ CONTIKI=../../..
 CONTIKI_PROJECT = node
 CFLAGS += -DPROJECT_CONF_H=\"project-conf.h\"
 
-TARGET ?= jn516x
-ifeq ($(TARGET),wismote)
-TARGET_MEMORY_MODEL = large
-endif
+#TARGET ?= jn516x
+#ifeq ($(TARGET),wismote)
+#TARGET_MEMORY_MODEL = large
+#endif
 
 CONTIKI_WITH_IPV6 = 1
 

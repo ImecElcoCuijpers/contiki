@@ -466,7 +466,7 @@ frame802154_parse(uint8_t *data, int len, frame802154_t *pf)
     linkaddr_copy((linkaddr_t *)&(pf->src_addr), &linkaddr_null);
     pf->src_pid = 0;
   }
-  
+
 #if LLSEC802154_SECURITY_LEVEL
   if(fcf.security_enabled) {
     pf->aux_hdr.security_control.security_level = p[0] & 7;
@@ -484,7 +484,7 @@ frame802154_parse(uint8_t *data, int len, frame802154_t *pf)
         p ++;
       }
     }
-    
+
 #if LLSEC802154_USES_EXPLICIT_KEYS
     key_id_mode = pf->aux_hdr.security_control.key_id_mode;
     if(key_id_mode) {

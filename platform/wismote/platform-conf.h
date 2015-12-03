@@ -155,8 +155,8 @@ typedef unsigned long off_t;
 #define CC2520_CCA_PORT(type)      P1##type
 #define CC2520_CCA_PIN             7
 /* P2.0 - Input:  SFD from CC2520 */
-#define CC2520_SFD_PORT(type)      P2##type
-#define CC2520_SFD_PIN             0
+#define CC2520_SFD_PORT(type)      P4##type
+#define CC2520_SFD_PIN             1
 /* P3.0 - Output: SPI Chip Select (CS_N) */
 #define CC2520_CSN_PORT(type)      P3##type
 #define CC2520_CSN_PIN             0

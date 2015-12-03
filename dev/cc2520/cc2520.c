@@ -31,6 +31,7 @@
 /*
  * This code is almost device independent and should be easy to port.
  */
+#define PACKETBUF_WITH_PACKET_TYPE
 
 #include "contiki.h"
 
@@ -71,6 +72,8 @@
 #define LEDS_ON(x)
 #define LEDS_OFF(x)
 #endif
+
+
 
 void cc2520_arch_init(void);
 
@@ -136,6 +139,41 @@ static uint8_t volatile poll_mode = 0;
 /* Do we perform a CCA before sending? */
 static uint8_t send_on_cca = WITH_SEND_CCA;
 
+
+
+
+
+/* Returns last packet timestamp */
+static rtimer_clock_t get_last_packet_timestamp(void){
+//#if CC2520_CONF_SFD_TIMESTAMPS
+ //return last_packet_timestamp;//cc2520_sfd_start_time;
+//#else 
+  //printf("\n\n\nTBCCR1:[%d]\n\n\n",TBCCR1); 
+  return TBCCR1;//-1364;//TBCCR1;
+//#endif //USED IN CC2420
+}
+
+
+/* Configures timer B to capture SFD rising edge */
+static void setup_sfd_rising_edge()
+{
+  // Need to select the special function! 
+  CC2520_SFD_PORT(SEL) = BV(CC2520_SFD_PIN); 
+
+  // start timer B - 32768 ticks per second 
+  TBCTL = TBSSEL_1 | TBCLR; //TBSSEL_1 = clock selection and devider
+  //TBCTL =  0x0204;//|TBCLR; //TBSSEL_1 = clock selection and devider
+  // Capture mode: 1 - pos. edge 
+  TBCCTL1 = CM_1 | CAP | SCS; //Timer_B x Capture/Compare Control Register n
+  //TBCCTL1 = 0x4900; //Timer_B x Capture/Compare Control Register n
+  // Start Timer_B in continuous mode. 
+  //TBCTL |= 0x0020; //it is already started?
+  TBCTL |= MC1;  
+// Sync with RTIMER 
+  TBR = RTIMER_NOW();//TBxR
+  
+}
+
 static radio_result_t
 get_value(radio_param_t param, radio_value_t *value)
 {
@@ -151,10 +189,10 @@ get_value(radio_param_t param, radio_value_t *value)
     return RADIO_RESULT_OK;
   case RADIO_PARAM_RX_MODE:
     *value = 0;
-    if(getreg(CC2520_FRMFILT0) & FRAME_FILTER_ENABLE) {
+    if(getreg(CC2520_FRMFILT0) & FRAME_FILTER_ENABLE) { //Bit 0 of frmctrl
       *value |= RADIO_RX_MODE_ADDRESS_FILTER;
     }
-    if(getreg(CC2520_FRMCTRL0) & AUTOACK) {
+    if(getreg(CC2520_FRMCTRL0) & AUTOACK) {//Bit 5
       *value |= RADIO_RX_MODE_AUTOACK;
     }
     if(poll_mode) {
@@ -234,7 +272,7 @@ get_object(radio_param_t param, void *dest, size_t size)
     if(size != sizeof(rtimer_clock_t) || !dest) {
       return RADIO_RESULT_INVALID_VALUE;
     }    
-    *(rtimer_clock_t*)dest = cc2520_sfd_start_time;
+    *(rtimer_clock_t*)dest = get_last_packet_timestamp();
     return RADIO_RESULT_OK;
 #else
     return RADIO_RESULT_NOT_SUPPORTED;
@@ -331,6 +369,7 @@ off(void)
 
   ENERGEST_OFF(ENERGEST_TYPE_LISTEN);
   strobe(CC2520_INS_SRFOFF);
+CC2520_DISABLE_FIFOP_INT();
   if(!poll_mode) {
     CC2520_DISABLE_FIFOP_INT();
   }
@@ -454,9 +493,9 @@ cc2520_init(void)
 
   cc2520_set_pan_addr(0xffff, 0x0000, NULL);
   cc2520_set_channel(26);
-
+  setup_sfd_rising_edge();
   flushrx();
-  
+  CC2520_CLEAR_FIFOP_INT();
   set_poll_mode(0);
 
   process_start(&cc2520_process, NULL);
@@ -491,13 +530,13 @@ cc2520_transmit(unsigned short payload_len)
 #define LOOP_20_SYMBOLS CC2520_CONF_SYMBOL_LOOP_COUNT
 #endif
 
-  if(send_on_cca) {
+/*  if(send_on_cca) { ELCO_MOD
     strobe(CC2520_INS_SRXON);
     BUSYWAIT_UNTIL(status() & BV(CC2520_RSSI_VALID) , RTIMER_SECOND / 10);
     strobe(CC2520_INS_STXONCCA);
-  } else {
+  } else {*/
     strobe(CC2520_INS_STXON);
-  }
+  //}
   for(i = LOOP_20_SYMBOLS; i > 0; i--) {
     if(CC2520_SFD_IS_1) {
 #if PACKETBUF_WITH_PACKET_TYPE
@@ -744,7 +783,7 @@ PROCESS_THREAD(cc2520_process, ev, data)
   while(1) {
     PROCESS_YIELD_UNTIL(!poll_mode && ev == PROCESS_EVENT_POLL);
 
-    PRINTF("cc2520_process: calling receiver callback\n");
+    printf("cc2520_process: calling receiver callback\n");
 
     packetbuf_clear();
     packetbuf_set_attr(PACKETBUF_ATTR_TIMESTAMP, last_packet_timestamp);
@@ -764,7 +803,8 @@ cc2520_read(void *buf, unsigned short bufsize)
   uint8_t footer[2];
   uint8_t len;
 
-  if(!CC2520_FIFOP_IS_1) {
+  if(!CC2520_FIFOP_IS_1) {  
+    printf("\n\nFIFOP ERROR \n");
     return 0;
   }
 
@@ -779,6 +819,7 @@ cc2520_read(void *buf, unsigned short bufsize)
     flushrx();
     RIMESTATS_ADD(badsynch);
     RELEASE_LOCK();
+    printf("\nDropped in radio, max len exeeded\n");
     return 0;
   }
 
@@ -786,6 +827,7 @@ cc2520_read(void *buf, unsigned short bufsize)
     flushrx();
     RIMESTATS_ADD(tooshort);
     RELEASE_LOCK();
+    printf("\nDropped in radio, FOOTER LEN MIN len exeeded\n");
     return 0;
   }
 
@@ -793,6 +835,7 @@ cc2520_read(void *buf, unsigned short bufsize)
     flushrx();
     RIMESTATS_ADD(toolong);
     RELEASE_LOCK();
+    printf("\nDropped in radio, SOMETHING ELSE exeeded\n");
     return 0;
   }
 
@@ -835,6 +878,7 @@ cc2520_read(void *buf, unsigned short bufsize)
   RELEASE_LOCK();
 
   if(len < FOOTER_LEN) {
+    printf("smaller than FOOTER LENG");
     return 0;
   }
 
@@ -981,7 +1025,7 @@ set_auto_ack(uint8_t enable)
   }
   /* Writing RAM requires crystal oscillator to be stable. */
   BUSYWAIT_UNTIL((status() & (BV(CC2520_XOSC16M_STABLE))), RTIMER_SECOND / 10);
-  setreg(CC2520_FRMCTRL0, reg);
+  //setreg(CC2520_FRMCTRL0, reg);//ELCO_MOD
   RELEASE_LOCK();
 }
 /*---------------------------------------------------------------------------*/
@@ -1004,6 +1048,7 @@ set_frame_filtering(uint8_t enable)
  setreg(CC2520_FRMFILT0, reg);
  RELEASE_LOCK();
 }
+
 /*---------------------------------------------------------------------------*/
 /* Enable or disable radio interrupts (both FIFOP and SFD timer capture) */
 static void
